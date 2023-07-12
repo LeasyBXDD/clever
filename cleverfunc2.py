@@ -1,11 +1,7 @@
 import numpy as np
 import torch
-import torch.nn as nn
-from cleverhans.torch.attacks.projected_gradient_descent import (
-    projected_gradient_descent,
-)
+from cleverhans.torch.attacks.projected_gradient_descent import projected_gradient_descent
 from scipy.spatial.distance import cdist
-import cleverhans
 
 # 计算 Clever 指数
 def clever_distance(model, audio, num_samples, k=5):
@@ -27,18 +23,11 @@ def clever_distance(model, audio, num_samples, k=5):
     random_inputs = torch.randn((num_samples,) + audio.shape)
     # 计算随机输入样本的 Jacobian 矩阵
     jacobian_random = jacobian(random_inputs)
-    lipschitz_estimates = []
     # 计算 Lipschitz 估计值
-    for i in range(num_samples):
-        for j in range(i + 1, num_samples):
-            dist_inputs = cdist(random_inputs[i].numpy(), random_inputs[j].numpy())
-            dist_outputs = cdist(jacobian_random[i].numpy(), jacobian_random[j].numpy())
-            lipschitz_estimate = dist_outputs / dist_inputs
-            lipschitz_estimates.append(lipschitz_estimate)
-
+    lipschitz_estimates = cdist(jacobian_random.reshape(num_samples, -1), random_inputs.reshape(num_samples, -1)) \
+                         / cdist(random_inputs.reshape(num_samples, -1), random_inputs.reshape(num_samples, -1))
     # 取 k 个最小的 Lipschitz 估计值的平均值作为 Clever 指数
-    k_smallest = np.partition(np.array(lipschitz_estimates), k)[:k]
-    clever = np.mean(k_smallest)
+    clever = np.mean(np.partition(lipschitz_estimates, k)[:k])
     return clever
 
 # 恢复被扰动的音频信号
