@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from torch.autograd.variable import Variable
 from torchvision.utils import save_image
 import librosa
@@ -36,9 +37,13 @@ def recover_label_with_clever(model, denoised_mel_spectrogram, num_classes, norm
 
 
 # 定义C值和恢复方法的权重
-C = ...
-weight_clever = ...
-weight_second_prob = ...
+
+# C：阈值，用于判断是否对对抗样本进行恢复。
+# weight_clever：CLEVER 方法的权重。
+# weight_second_prob：第二概率方法的权重。
+C = 0.5
+weight_clever = 0.7
+weight_second_prob = 0.3
 
 
 def recovery_system(outputs, weights, C):
@@ -62,9 +67,50 @@ def recovery_system(outputs, weights, C):
         return true_label
 
 
+# 定义GAN模型
+class Generator(nn.Module):
+    def __init__(self, input_dim, hidden_dim, output_dim):
+        super(Generator, self).__init__()
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, output_dim)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = torch.relu(x)
+        x = self.fc2(x)
+        x = torch.tanh(x)
+        return x
+
+
+class Discriminator(nn.Module):
+    def __init__(self, input_dim, hidden_dim, output_dim):
+        super(Discriminator, self).__init__()
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, output_dim)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = torch.relu(x)
+        x = self.fc2(x)
+        return x
+
+
+class MyGANModel(nn.Module):
+    def __init__(self, input_dim=10, hidden_dim=20, output_dim=1):
+        super(MyGANModel, self).__init__()
+        self.G = Generator(input_dim, hidden_dim, output_dim)
+        self.D = Discriminator(input_dim, hidden_dim, output_dim)
+
+    def forward(self, x):
+        return self.D(self.G(x))
+
+
 # 加载GAN模型和音频文件
-GAN_model = ...
-audio_file = ...
+
+# GAN_model：GAN 模型，用于去除音频文件中的噪声。
+# audio_file：音频文件，需要进行去噪和恢复标签。
+GAN_model = MyGANModel()
+audio_file = "path/to/audio/file.wav"
 
 
 def denoise_with_GAN(GAN_model, audio_file):
