@@ -4,13 +4,25 @@ import torch
 import torch.nn as nn
 from cleverfunc import clever_distance, recover_audio
 
+
 # 定义一个测试类 TestAudio，用于测试 clever_distance 和 recover_audio 函数
 class TestAudio(unittest.TestCase):
     def setUp(self):
+        # 假设我们有一个预训练模型的结构定义
+        class PretrainedModel(nn.Module):
+            def __init__(self):
+                super(PretrainedModel, self).__init__()
+                # 添加你的模型层
+                pass
+
+            def forward(self, x):
+                # 定义你的前向传播
+                pass
+
+        # 实例化模型
+        self.model = PretrainedModel()
         # 加载预训练模型的参数
-        pretrained_model = torch.load("pretrained_model.pth")
-        # 将预训练模型的参数设置为神经网络的参数
-        self.model = pretrained_model
+        self.model.load_state_dict(torch.load("pretrained_model.pth"))
         # 随机生成一个音频
         self.audio = np.random.rand(100, 10)
         self.epsilon = 0.1
@@ -34,6 +46,7 @@ class TestAudio(unittest.TestCase):
         self.assertEqual(
             recovered_audio.shape, self.audio.shape
         )
+
 
 # 如果这个文件是主程序，就执行测试
 if __name__ == "__main__":
