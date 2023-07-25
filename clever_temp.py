@@ -43,18 +43,37 @@ def recover_label_with_clever(model, denoised_mel_spectrogram, num_classes, norm
     return recovered_label
 
 
-# 采用恢复系统处理输出
-def recovery_system(outputs, weights, C):
-    Judge_R = torch.tensor(outputs) * torch.tensor(weights)  # 计算评估值
-    max_judge_r = torch.max(Judge_R)  # 获取最大的评估值
+# 扰动的置信度（计算模型对扰动输入的置信度）
+def compute_disturbed_confidence(model, input, num_samples=100, epsilon=0.01):
+    # Generate random noise
+    noise = torch.randn(num_samples, *input.shape).cuda() * epsilon
 
-    # 如果最大的评估值小于阈值C，则拒绝样本，进行手动审核或丢弃
-    if max_judge_r < C:
+    # Add noise to the input
+    disturbed_inputs = input + noise
+
+    # Compute the model's predictions
+    predictions = model(disturbed_inputs)
+
+    # Compute the confidence of the predictions
+    confidence = predictions.max(dim=1)[0].mean().item()
+
+    return confidence
+
+
+# 采用恢复系统处理输出
+def recovery_system(outputs, weights, threshold):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    evaluation_values = torch.tensor(outputs).to(device) * torch.tensor(weights).to(device)  # 计算评估值
+    max_evaluation_value = torch.max(evaluation_values)  # 获取最大的评估值
+
+    # 如果最大的评估值小于阈值threshold，则拒绝样本，进行手动审核或丢弃
+    if max_evaluation_value < threshold:
         print("Sample rejected, send it for manual review or discard.")
         return None
     else:
         # 找出评估值等于最大评估值的输出标签
-        possible_labels = [output for output, judge_r in zip(outputs, Judge_R) if judge_r == max_judge_r]
+        possible_labels = [output for output, evaluation_value in zip(outputs, evaluation_values) if
+                           evaluation_value == max_evaluation_value]
         if not possible_labels:
             print("No possible labels found.")
             return None
@@ -63,6 +82,18 @@ def recovery_system(outputs, weights, C):
         print(f"Recovered label: {true_label}")
         return true_label
 
+def prepare_input(audio_file):
+    # Load the audio file
+    y, sr = librosa.load(audio_file, sr=None)
+
+    # Optionally, you can apply some audio processing steps here, for example:
+    # - Apply short-time Fourier transform (STFT) to convert the audio to the frequency domain
+    # - Apply Mel-frequency cepstral coefficients (MFCC) to extract features from the audio
+
+    # Convert the audio data to a Torch tensor and add an extra dimension for the batch size
+    input_tensor = torch.tensor(y).unsqueeze(0)
+
+    return input_tensor
 
 # 用GAN去噪
 def denoise_with_GAN(GAN_model, audio_file, C=0.5, weight_clever=0.7, weight_second_prob=0.3):
@@ -112,4 +143,24 @@ if __name__ == "__main__":
     gan_model.load_state_dict(checkpoint['model_state_dict'])  # 设置模型的状态字典
 
     audio_file = "path/to/audio/file.wav"  # 音频文件路径
-    denoise_with_GAN(gan_model, audio_file)  # 使用GAN模型去噪音频文件
+    denoised_audio = denoise_with_GAN(gan_model, audio_file)  # 使用GAN模型去噪音频文件
+
+    # 假设你有一个函数可以将去噪后的音频转化为输入张量
+    input = prepare_input(denoised_audio)
+
+    # Compute the outputs using your three methods
+    # You should replace these functions with your real functions
+    label_with_second_probability = recover_label_with_second_probability(input, gan_model)
+    label_with_clever = recover_label_with_clever(input, gan_model)
+    label_with_disturbed_confidence = compute_disturbed_confidence(gan_model, input)
+
+    # Specify the weights for each method
+    weight_for_second_probability = 0.3
+    weight_for_clever = 0.3
+    weight_for_disturbed_confidence = 0.4
+
+    # Apply the recovery system
+    outputs = [label_with_second_probability, label_with_clever, label_with_disturbed_confidence]
+    weights = [weight_for_second_probability, weight_for_clever, weight_for_disturbed_confidence]
+    threshold = 0.5  # You may need to adjust this value based on your specific requirements
+    recovered_label = recovery_system(outputs, weights, threshold)
