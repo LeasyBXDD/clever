@@ -25,41 +25,41 @@ def recover_label_with_second_probability(model, denoised_mel_spectrogram):
 
 # C&W攻击方法
 def CW_attack(model, input, target, num_steps=1000, learning_rate=0.01):
-    """Execute the Carlini & Wagner (C&W) attack method."""
-    # Initialize the perturbation with zeros
+    """执行 Carlini & Wagner (C&W) 攻击方法。"""
+    # 初始化扰动为零
     perturbation = torch.zeros_like(input).cuda()
     perturbation.requires_grad = True
 
-    # Define the optimizer
+    # 定义优化器
     optimizer = optim.Adam([perturbation], lr=learning_rate)
 
     for step in range(num_steps):
-        # Compute the perturbed input
+        # 计算扰动后的输入
         perturbed_input = input + perturbation
 
-        # Compute the model's output
+        # 计算模型的输出
         output = model(perturbed_input)
 
-        # Compute the loss
+        # 计算损失
         loss = torch.nn.CrossEntropyLoss()(output, target)
 
-        # Backward pass
+        # 反向传播
         loss.backward()
 
-        # Update the perturbation
+        # 更新扰动
         optimizer.step()
 
-        # Project the perturbation to the L2 ball (optional)
+        # 投影扰动到 L2 球（可选）
         perturbation.data = project_to_l2_ball(perturbation.data)
 
-    # Compute the perturbed input
+    # 计算扰动后的输入
     perturbed_input = input + perturbation
 
     return perturbed_input
 
 
 def project_to_l2_ball(x, eps=1.0):
-    """Project the input tensor to the L2-ball."""
+    """将输入张量投影到 L2 球上。"""
     norm = torch.norm(x)
     if norm > eps:
         x = x / norm * eps
@@ -83,19 +83,19 @@ def recover_label_with_cw_attack(model, denoised_mel_spectrogram, num_classes):
     recovered_label = torch.argmin(distances)  # 选择距离最小的标签作为恢复的标签
     return recovered_label
 
-
 # 扰动的置信度（计算模型对扰动输入的置信度）
 def compute_disturbed_confidence(model, input, num_samples=100, epsilon=0.01):
-    # Generate random noise
+    """计算模型对扰动输入的置信度。"""
+    # 生成随机噪声
     noise = torch.randn(num_samples, *input.shape).cuda() * epsilon
 
-    # Add noise to the input
+    # 将噪声添加到输入中
     disturbed_inputs = input + noise
 
-    # Compute the model's predictions
+    # 计算模型的预测结果
     predictions = model(disturbed_inputs)
 
-    # Compute the confidence of the predictions
+    # 计算预测结果的置信度
     confidence = predictions.max(dim=1)[0].mean().item()
 
     return confidence
@@ -125,14 +125,14 @@ def recovery_system(outputs, weights, threshold):
 
 
 def prepare_input(audio_file):
-    # Load the audio file
+    # 加载音频文件
     y, sr = librosa.load(audio_file, sr=None)
 
-    # Optionally, you can apply some audio processing steps here, for example:
-    # - Apply short-time Fourier transform (STFT) to convert the audio to the frequency domain
-    # - Apply Mel-frequency cepstral coefficients (MFCC) to extract features from the audio
+    # 可选：在此处应用一些音频处理步骤，例如：
+    # - 对音频应用短时傅里叶变换（STFT）将其转换为频域
+    # - 对音频应用梅尔频率倒谱系数（MFCC）提取其特征
 
-    # Convert the audio data to a Torch tensor and add an extra dimension for the batch size
+    # 将音频数据转换为 Torch 张量，并为批处理大小添加一个额外的维度
     input_tensor = torch.tensor(y).unsqueeze(0)
 
     return input_tensor
