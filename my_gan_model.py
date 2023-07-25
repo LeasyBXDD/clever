@@ -1,36 +1,59 @@
 import torch
 import torch.nn as nn
 
-class Generator(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim):
-        super(Generator, self).__init__()
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, output_dim)
 
-    def forward(self, x):
-        x = self.fc1(x)
-        x = torch.relu(x)
-        x = self.fc2(x)
-        x = torch.tanh(x)
-        return x
+class Generator(nn.Module):
+    def __init__(self, nz, ngf, nc):
+        super(Generator, self).__init__()
+        self.main = nn.Sequential(
+            nn.ConvTranspose2d(nz, ngf * 8, 4, 1, 0, bias=False),
+            nn.BatchNorm2d(ngf * 8),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf * 4),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf * 2),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(ngf, nc, 4, 2, 1, bias=False),
+            nn.Tanh()
+        )
+
+    def forward(self, input):
+        return self.main(input)
+
 
 class Discriminator(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim):
+    def __init__(self, nc, ndf):
         super(Discriminator, self).__init__()
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, output_dim)
+        self.main = nn.Sequential(
+            nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf * 2),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf * 4),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf * 8),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
+            nn.Sigmoid()
+        )
 
-    def forward(self, x):
-        x = self.fc1(x)
-        x = torch.relu(x)
-        x = self.fc2(x)
-        return x
+    def forward(self, input):
+        return self.main(input).view(-1, 1).squeeze(1)
+
 
 class MyGANModel(nn.Module):
-    def __init__(self, input_dim=10, hidden_dim=20, output_dim=1):
+    def __init__(self, nz=100, ngf=64, ndf=64, nc=3):
         super(MyGANModel, self).__init__()
-        self.G = Generator(input_dim, hidden_dim, output_dim)
-        self.D = Discriminator(input_dim, hidden_dim, output_dim)
+        self.G = Generator(nz, ngf, nc)
+        self.D = Discriminator(nc, ndf)
 
     def forward(self, x):
         return self.D(self.G(x))
