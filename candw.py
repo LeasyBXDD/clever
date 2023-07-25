@@ -4,7 +4,7 @@ from torchvision.utils import save_image
 import librosa
 import numpy as np
 import soundfile as sf
-from my_gan_model import MyGANModel  # 导入自定义的我的GAN模型
+from my_gan_model import MyGANModel, Generator, Discriminator  # 导入自定义的我的GAN模型
 import torch.optim as optim
 
 # 设备选择
@@ -183,8 +183,16 @@ def denoise_with_GAN(GAN_model, audio_file, C=0.5):
 
 # 主函数
 def main():
-    GAN_model = MyGANModel()
-    GAN_model.to(device)
+    G = Generator(nz=100, ngf=64, nc=3).to(device)
+    G.load_state_dict(torch.load("MNIST_DCGAN_results/generator_param.pkl"))
+
+    D = Discriminator(nc=3, ndf=64).to(device)
+    D.load_state_dict(torch.load("MNIST_DCGAN_results/discriminator_param.pkl"))
+
+    GAN_model = MyGANModel(nz=100, ngf=64, ndf=64, nc=3).to(device)
+    GAN_model.G = G
+    GAN_model.D = D
+
     audio_file = 'noisy.wav'
     denoise_with_GAN(GAN_model, audio_file)
 
