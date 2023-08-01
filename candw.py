@@ -184,10 +184,10 @@ def denoise_with_GAN(GAN_model, audio_file, C=0.5):
 # 主函数
 def main():
     G = Generator(nz=100, ngf=64, nc=3).to(device)
-    G.load_state_dict(torch.load("MNIST_DCGAN_results/generator_param.pkl"))
+    G.load_state_dict(torch.load("generator.pth"))
 
     D = Discriminator(nc=3, ndf=64).to(device)
-    D.load_state_dict(torch.load("MNIST_DCGAN_results/discriminator_param.pkl"))
+    D.load_state_dict(torch.load("discriminator.pth"))
 
     GAN_model = MyGANModel(nz=100, ngf=64, ndf=64, nc=3).to(device)
     GAN_model.G = G
